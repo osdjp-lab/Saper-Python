@@ -1,136 +1,24 @@
-"""Minesweeper game implemented via object oriented programming (OOP)."""
+"""Minesweeper game implemented via object oriented programming (OOP).
+
+Each Tile is initiated after minefield generation and field value calculation.
+
+Each Tile holds its own state, location, value and references to neighbouring
+Tiles.
+
+User triggered Tile uncovering is handled by Tile method.
+
+"""
 # %%
 import tkinter as tk
 from PIL import Image, ImageTk
+from random import randrange
 
 ICON = {}  # minesweeper icon dictionary
 ICON['c'] = Image.open("Minesweeper icons\\facingDown.png")
 ICON['f'] = Image.open("Minesweeper icons\\flagged.png")
-ICON['m'] = Image.open("Minesweeper icons\\bomb.png")
 for i in range(9):
-    ICON[str(i)] = Image.open("Minesweeper icons\\" + str(i) + ".png")
-
-# %%
-
-
-class MineField:
-    """Contains playing field data.
-
-    Args:
-        num_of_mines (int, optional): Number of mines.
-        rows (int, optional): Contains the number of rows.
-        columns (int, optional): Contains the number of columns.
-        force_empty (list or tuple, optional): Cells required to be empty by
-            first player selection.
-        cov (list of lists, optional): Contains the coordinates of covered
-            fields.
-        uncov (list of lists, optional): Contains the coordinates of uncovered
-            fields.
-
-    Attributes:
-        num_of_mines (int): Number of mines.
-        rows (int): Contains the number of rows.
-        columns (int): Contains the number of columns.
-        force_empty (list or tuple): Cells required to be empty by first
-            player selection.
-        cov (list of lists): Contains the coordinates of currently covered
-            fields.
-        uncov (list of lists): Contains the coordinates of currently uncovered
-            fields.
-
-    Raises:
-        TypeError: If given values do not match their expected types.
-
-    """
-
-    def __init__(self, num_of_mines=40, rows=10, columns=10,
-                 force_empty=None, cov=None, uncov=None):
-        self.num_of_mines = num_of_mines
-        self.rows = rows
-        self.columns = columns
-        if force_empty is not None:
-            self.force_empty = force_empty
-        if cov is not None:
-            self.cov = cov
-        if uncov is not None:
-            self.uncov = uncov
-
-    def __repr__(self):
-        txt = "{"
-        txt += f"'num_of_mines':{self.num_of_mines}, "
-        txt += f"'rows':{self.rows}, "
-        txt += f"'columns':{self.columns}, "
-        txt += f"'cov':{self.cov}, "
-        txt += f"'uncov':{self.uncov}, "
-        txt += "}"
-        return txt
-
-    def gen_mines(self):
-        """Generates a random arrangement of mines in the playing field."""
-        pass
-
-    @property
-    def num_of_mines(self):
-        return self._num_of_mines
-
-    @num_of_mines.setter
-    def num_of_mines(self, num_of_mines):
-        if not isinstance(num_of_mines, int):
-            raise TypeError('num_of_mines should be of type int')
-        self._num_of_mines = num_of_mines
-
-    @property
-    def rows(self):
-        return self._rows
-
-    @rows.setter
-    def rows(self, rows):
-        if not isinstance(rows, int):
-            raise TypeError('rows should be of type int')
-        self._rows = rows
-
-    @property
-    def columns(self):
-        return self._columns
-
-    @columns.setter
-    def columns(self, columns):
-        if not isinstance(columns, int):
-            raise TypeError('columns should be of type int')
-        self._columns = columns
-
-    @property
-    def force_empty(self):
-        return self._force_empty
-
-    @force_empty.setter
-    def force_empty(self, force_empty):
-        if not isinstance(force_empty, (list, tuple)):
-            raise TypeError('force_empty should be of type list or tuple')
-        self._force_empty = force_empty
-
-    @property
-    def cov(self):
-        return self._cov
-
-    @cov.setter
-    def cov(self, cov):
-        if not isinstance(cov, list):
-            raise TypeError('cov should be of type list of lists')
-        self._cov = cov
-
-    @property
-    def uncov(self):
-        return self._uncov
-
-    @uncov.setter
-    def uncov(self, uncov):
-        if not isinstance(uncov, list):
-            raise TypeError('uncov should be of type list of lists')
-        self._uncov = uncov
-
-
-# %%
+    ICON[i] = Image.open("Minesweeper icons\\" + str(i) + ".png")
+ICON[9] = Image.open("Minesweeper icons\\bomb.png")
 
 # %%
 
@@ -142,36 +30,41 @@ class Tile:
         parent (tk.Frame): Parent Frame of Tile.
         x (int): x coordinate.
         y (int): y coordinate.
-        func (function): Function for tile state change.
-        state (str): Current state of the given tile covered ('c'), uncovered
-            ('0' - '8'), flagged ('f') or mine ('m').
-        size (int): Size of tile in pixels.
+        state (int): State of the given tile values from range 0 to 9.
+        cov (bool): Defaults to True if Tile is covered False overwise.
+        size (int): Size of tile in pixels. Defaults to None.
 
     Attributes:
         parent (tk.Frame): Parent Frame of Tile.
         x (int): x coordinate.
         y (int): y coordinate.
-        func (function): Function for tile state change.
-        state (int): Current state of the given tile covered, uncovered or
-            flagged.
-        size (int): Size of tile in pixels.
+        state (int): State of the given tile values from range 0 to 9.
+        cov (bool): Defaults to True if Tile is covered False overwise.
+        size (int): Size of tile in pixels. Defaults to None.
 
     Raises:
         TypeError: If given values do not match their expected types.
 
     """
 
-    def __init__(self, parent, x, y, func, state='c', size=None):
+    def __init__(self, parent, x, y, state, cov=True, size=None):
         self.parent = parent
         self.x = x
         self.y = y
-        self.func = func
         self.state = state
-        if size is not None:
-            self.size = size
+        self.cov = cov
+        if size is None:
+            self._size = size
         else:
-            self.size = None
-        self._update()
+            self.size = size
+        if self.cov:
+            self._update('c')
+        else:
+            self._update(self.state)
+        self._top_tile = None
+        self._bottom_tile = None
+        self._left_tile = None
+        self._right_tile = None
 
     def __repr__(self):
         txt = "{"
@@ -179,38 +72,115 @@ class Tile:
         txt += f"'x':{self.x}, "
         txt += f"'y':{self.y}, "
         txt += f"'state':{self.state}, "
+        txt += f"'cov':{self.cov}, "
         txt += f"'size':{self.size}"
         txt += "}"
         return txt
 
     def switch(self, state):
-        """Switch state of tile."""
+        """Switch state of Tile."""
         self.button.destroy()
-        self.state = state
-        self._update()
+        self._update(state)
 
-    def _update(self):
-        """Initialize tile with current parameters."""
-        bitmap = ICON.get(self.state)
+    def _update(self, state):
+        """Initialize Tile with current parameters."""
+        bitmap = ICON.get(state)
         if self.size is not None:
             bitmap = bitmap.resize((self.size, self.size))
         self.bitmap = ImageTk.PhotoImage(image=bitmap)
         self.button = tk.Button(master=self.parent, image=self.bitmap)
         self.button.bind("<ButtonPress-1><ButtonRelease-1>", self.left_click)
         self.button.bind("<ButtonPress-3><ButtonRelease-3>", self.right_click)
+        self.grid()
 
     def left_click(self, event):
-        self.switch('m')
+        """Uncover Tile."""
+        if self.cov:
+            if self.state == 9:
+                self._uncover_all()
+            else:
+                self._uncover()
+
+    def _uncover_all(self):
+        """Recursive uncover of all Tiles.
+        
+        BUG Partial uncover: when triggered mine is on isolated island
+        surrounded by uncovered Tiles.
+
+        NOTE Solution separate out triggered flag from cov so that _uncover_all
+        can traverse uncovered Tiles.
+        
+        """
+        self.switch(self.state)
+        self.cov = False
+        # uncover surrounding Tiles if their cov = True
+        # top_tile
+        if self.top_tile is not None:
+            if self.top_tile.cov:
+                self.top_tile._uncover_all()
+        # bottom_tile
+        if self.bottom_tile is not None:
+            if self.bottom_tile.cov:
+                self.bottom_tile._uncover_all()
+        # left_tile
+        if self.left_tile is not None:
+            if self.left_tile.cov:
+                self.left_tile._uncover_all()
+        # right_tile
+        if self.right_tile is not None:
+            if self.right_tile.cov:
+                self.right_tile._uncover_all()
+
+    def _uncover(self):
+        """Recursive uncover of zero value and surrounding Tiles."""
+        self.switch(self.state)
+        self.cov = False
+        if self.state == 0:
+            # recursively check bordering Tiles
+            # uncover and continue or leave
+            # top_tile
+            if self.top_tile is not None:
+                if self.top_tile.cov:
+                    if self.top_tile.state == 0:
+                        self.top_tile._uncover()
+                    elif self.top_tile.state != 9:
+                        self.top_tile.switch(self.top_tile.state)
+                        self.top_tile.cov = False
+            # bottom_tile
+            if self.bottom_tile is not None:
+                if self.bottom_tile.cov:
+                    if self.bottom_tile.state == 0:
+                        self.bottom_tile._uncover()
+                    elif self.bottom_tile.state != 9:
+                        self.bottom_tile.switch(self.bottom_tile.state)
+                        self.bottom_tile.cov = False
+            # left_tile
+            if self.left_tile is not None:
+                if self.left_tile.cov:
+                    if self.left_tile.state == 0:
+                        self.left_tile._uncover()
+                    elif self.left_tile.state != 9:
+                        self.left_tile.switch(self.left_tile.state)
+                        self.left_tile.cov = False
+            # right_tile
+            if self.right_tile is not None:
+                if self.right_tile.cov:
+                    if self.right_tile.state == 0:
+                        self.right_tile._uncover()
+                    elif self.right_tile.state != 9:
+                        self.right_tile.switch(self.right_tile.state)
+                        self.right_tile.cov = False
 
     def right_click(self, event):
-        state = self._func(self.x, self.y)
-        self.switch(state)
+        """Flag Tile."""
+        if self.cov:
+            self.switch('f')
 
     def pack(self, *args, **kwargs):
         self.button.pack(*args, **kwargs)
 
     def grid(self, *args, **kwargs):
-        self.button.grid(*args, **kwargs)
+        self.button.grid(row=self.x, column=self.y, *args, **kwargs)
 
     @property
     def parent(self):
@@ -243,24 +213,24 @@ class Tile:
         self._y = y
 
     @property
-    def func(self):
-        return self._func
-
-    @func.setter
-    def func(self, func):
-        if not callable(func):
-            raise TypeError('func should be of type function')
-        self._func = func
-
-    @property
     def state(self):
         return self._state
 
     @state.setter
     def state(self, state):
-        if not isinstance(state, str):
-            raise TypeError('state should be of type str')
+        if not isinstance(state, int):
+            raise TypeError('state should be of type int')
         self._state = state
+
+    @property
+    def cov(self):
+        return self._cov
+
+    @cov.setter
+    def cov(self, cov):
+        if not isinstance(cov, bool):
+            raise TypeError('cov should be of type bool')
+        self._cov = cov
 
     @property
     def size(self):
@@ -272,309 +242,416 @@ class Tile:
             raise TypeError('size should be of type int')
         self._size = size
 
+    @property
+    def top_tile(self):
+        return self._top_tile
+
+    @top_tile.setter
+    def top_tile(self, top_tile):
+        if not isinstance(top_tile, Tile):
+            raise TypeError('top_tile should be of type Tile')
+        self._top_tile = top_tile
+
+    @property
+    def bottom_tile(self):
+        return self._bottom_tile
+
+    @bottom_tile.setter
+    def bottom_tile(self, bottom_tile):
+        if not isinstance(bottom_tile, Tile):
+            raise TypeError('bottom_tile should be of type Tile')
+        self._bottom_tile = bottom_tile
+
+    @property
+    def left_tile(self):
+        return self._left_tile
+
+    @left_tile.setter
+    def left_tile(self, left_tile):
+        if not isinstance(left_tile, Tile):
+            raise TypeError('left_tile should be of type Tile')
+        self._left_tile = left_tile
+
+    @property
+    def right_tile(self):
+        return self._right_tile
+
+    @right_tile.setter
+    def right_tile(self, right_tile):
+        if not isinstance(right_tile, Tile):
+            raise TypeError('right_tile should be of type Tile')
+        self._right_tile = right_tile
+
 
 # %%
-root = tk.Tk()
-root.title('Minesweeper')
-root.geometry('640x480')
-
-frame1 = tk.Frame(root)
-frame1.pack()
 
 
-def t(*args, **kwargs):
-    return '5'
+def value_calc_ver_1(minefield, x, y):
+    """Minimal amount of code value calculation.
 
-
-button1 = Tile(frame1, 0, 0, t, '3', 50)
-button1._update()
-button1.pack()
-
-root.mainloop()
-
-# %%
-
-
-class Board:
-    """Displays the minesweeper board.
-
-    Apart from displaying the board, allows updating currently displayed
-    fields on the board.
+    85 lines.
 
     Args:
-        parent (tk.Frame): Parent Frame of Tile.
-        minefield (MineField): Instance of MineField.
+        minefield (list of lists): Minefield containing 0 (empty fields) and 1
+            (mines).
+        x (int): Vertical size of minefield.
+        y (int): Horizontal size of minefield.
 
-    Attributes:
-        parent (tk.Frame): Parent Frame of Tile.
-        minefield (MineField): Instance of MineField.
-
-    Raises:
-        TypeError: If given values do not match their expected types.
+    Returns:
+        list of lists: Minefield containing calculated values.
 
     """
+    minefield_values = [y * [0] for _ in range(x)]
+    for i in range(x):
+        for j in range(y):
+            # if a field in either direction along the horizontal or vertical
+            # axis is out of bound then other fields sharing the same
+            # coordiate are also out of bound
+            up, down, left, right = True, True, True, True
+            # up-down check
+            if i == 0:
+                up = False
+            elif i + 1 == x:
+                down = False
+            # left-right check
+            if j == 0:
+                left = False
+            elif j + 1 == y:
+                right = False
+            if minefield[i][j] == 1:
+                value = 9
+            else:
+                # current field
+                value = minefield[i][j]
+                if up:
+                    # field above
+                    value += minefield[i-1][j]
+                    if down:
+                        # field below
+                        value += minefield[i+1][j]
+                        if left:
+                            # field to the left
+                            value += minefield[i][j-1]
+                            if right:
+                                # field to the right
+                                value += minefield[i][j+1]
+                                # remaining available fields
+                                value += minefield[i-1][j-1]
+                                value += minefield[i-1][j+1]
+                                value += minefield[i+1][j-1]
+                                value += minefield[i+1][j+1]
+                            else:
+                                value += minefield[i-1][j-1]
+                                value += minefield[i+1][j-1]
+                        else:
+                            # field to the right
+                            value += minefield[i][j+1]
+                            # remaining available fields
+                            value += minefield[i+1][j+1]
+                            value += minefield[i-1][j+1]
+                    else:
+                        if left:
+                            # field to the left
+                            value += minefield[i][j-1]
+                            if right:
+                                # field to the right
+                                value += minefield[i][j+1]
+                                # remaining available fields
+                                value += minefield[i-1][j-1]
+                                value += minefield[i-1][j+1]
+                            else:
+                                value += minefield[i-1][j-1]
+                        else:
+                            # field to the right
+                            value += minefield[i][j+1]
+                            # remaining available fields
+                            value += minefield[i-1][j+1]
+                else:
+                    # field below
+                    value += minefield[i+1][j]
+                    if left:
+                        # field to the left
+                        value += minefield[i][j-1]
+                        if right:
+                            # field to the right
+                            value += minefield[i][j+1]
+                            # remaining available fields
+                            value += minefield[i+1][j-1]
+                            value += minefield[i+1][j+1]
+                        else:
+                            value += minefield[i+1][j-1]
+                    else:
+                        # field to the right
+                        value += minefield[i][j+1]
+                        value += minefield[i+1][j+1]
+            minefield_values[i][j] = value
+    return minefield_values
 
-    def __init__(self, parent, minefield):
-        self.set_parent(parent)
-        self.set_minefield(minefield)
-        self._board = []
 
-    def __repr__(self):
-        txt = "{"
-        txt += f"'parent':{self.parent}, "
-        txt += f"'minefield':{self.minefield}, "
-        txt += f"'_board':{self._board}"
-        txt += "}"
-        return txt
+def value_calc_ver_2(minefield, x, y):
+    """Minimal amount of code value calculation.
 
-    def _update_board(self):
-        for i in range(self.minefield.rows):
-            tmp = []
-            for j in range(self.minefield.columns):
-                tmp.append(Tile(self.parent, i, j, self.lookup, size=50))
-            self._board.append(tmp)
-        for i in range(self.minefield.rows):
-            for j in range(self.minefield.columns):
-                self._board[i][j].grid(row=i, column=j)
-
-    def lookup(self):
-        pass
-
-    def get_parent(self):
-        return self.parent
-
-    def set_parent(self, parent):
-        if not isinstance(parent, tk.Frame):
-            raise TypeError('parent should be of type tkinter.Frame')
-        self.parent = parent
-
-    def get_minefield(self):
-        return self.minefield
-
-    def set_minefield(self, minefield):
-        if not isinstance(minefield, MineField):
-            raise TypeError('minefield should be of type MineField')
-        self.minefield = minefield
-
-
-# %%
-root = tk.Tk()
-root.title('Minesweeper')
-# root.geometry('500x500')
-
-frame1 = tk.Frame(root)
-frame1.pack()
-
-minefield = MineField()
-
-board = Board(frame1, minefield)
-board._update_board()
-
-root.mainloop()
-
-# %%
-
-
-class UserInput:
-    """User input for minesweeper gameplay.
-
-    Enables the selection of a field on the board and the choice of whether
-    to mark or uncover.
+    74 lines.
 
     Args:
-        coordinates (list): Selected coordinates.
-        action (str): Choice of action.
-        board_size (list): Choice of board size.
+        minefield (list of lists): Minefield containing 0 (empty fields) and 1
+            (mines).
+        x (int): Vertical size of minefield.
+        y (int): Horizontal size of minefield.
 
-    Attributes:
-        coordinates (list): Current selected coordinates.
-        action (str): Choice of action for currently selected coordinates.
-        board_size (list): Currently active board size.
-
-    Raises:
-        TypeError: If given values do not match their expected types.
+    Returns:
+        list of lists: Minefield containing calculated values.
 
     """
+    minefield_values = [y * [0] for _ in range(x)]
+    for i in range(x):
+        for j in range(y):
+            # if a field in either direction along the horizontal or vertical
+            # axis is out of bound then other fields sharing the same
+            # coordiate are also out of bound
+            if minefield[i][j] == 1:
+                value = 9
+            else:
+                # current field
+                value = minefield[i][j]
+                if i != 0:
+                    # field above
+                    value += minefield[i-1][j]
+                    if i + 1 != x:
+                        # field below
+                        value += minefield[i+1][j]
+                        if j != 0:
+                            # field to the left
+                            value += minefield[i][j-1]
+                            if j + 1 != y:
+                                # field to the right
+                                value += minefield[i][j+1]
+                                # remaining available fields
+                                value += minefield[i-1][j-1]
+                                value += minefield[i-1][j+1]
+                                value += minefield[i+1][j-1]
+                                value += minefield[i+1][j+1]
+                            else:
+                                value += minefield[i-1][j-1]
+                                value += minefield[i+1][j-1]
+                        else:
+                            # field to the right
+                            value += minefield[i][j+1]
+                            # remaining available fields
+                            value += minefield[i+1][j+1]
+                            value += minefield[i-1][j+1]
+                    else:
+                        if j != 0:
+                            # field to the left
+                            value += minefield[i][j-1]
+                            if j + 1 != y:
+                                # field to the right
+                                value += minefield[i][j+1]
+                                # remaining available fields
+                                value += minefield[i-1][j-1]
+                                value += minefield[i-1][j+1]
+                            else:
+                                value += minefield[i-1][j-1]
+                        else:
+                            # field to the right
+                            value += minefield[i][j+1]
+                            # remaining available fields
+                            value += minefield[i-1][j+1]
+                else:
+                    # field below
+                    value += minefield[i+1][j]
+                    if j != 0:
+                        # field to the left
+                        value += minefield[i][j-1]
+                        if j + 1 != y:
+                            # field to the right
+                            value += minefield[i][j+1]
+                            # remaining available fields
+                            value += minefield[i+1][j-1]
+                            value += minefield[i+1][j+1]
+                        else:
+                            value += minefield[i+1][j-1]
+                    else:
+                        # field to the right
+                        value += minefield[i][j+1]
+                        value += minefield[i+1][j+1]
+            minefield_values[i][j] = value
+    return minefield_values
 
-    def __init__(self, coordinates, action, board_size):
-        self.set_coordinates(coordinates)
-        self.set_action(action)
-        self.set_board_size(board_size)
 
-    def __repr__(self):
-        txt = "{"
-        txt += f"'coordinates':{self.coordinates}, "
-        txt += f"'action':{self.action}, "
-        txt += f"'board_size':{self.board_size}"
-        txt += "}"
-        return txt
+def value_calc_ver_3(minefield, x, y):
+    """Minimal number of steps value calculation.
 
-    def get_coordinates(self):
-        return self.coordinates
-
-    def set_coordinates(self, coordinates):
-        if not isinstance(coordinates, list):
-            raise TypeError('coordinates should be of type list')
-        self.coordinates = coordinates
-
-    def get_action(self):
-        return self.action
-
-    def set_action(self, action):
-        if not isinstance(action, str):
-            raise TypeError('action should be of type str')
-        self.action = action
-
-    def get_board_size(self):
-        return self.board_size
-
-    def set_board_size(self, board_size):
-        if not isinstance(board_size, list):
-            raise TypeError('board_size should be of type list')
-        self.board_size = board_size
-
-
-# %%
-
-
-# %%
-
-
-class Scoreboard:
-    """Keeps a tally of the current score.
-
-    Is responsible for keeping track of the number of uncovered mines,
-    number of times played as well as setup and win conditions.
+    78 lines.
 
     Args:
-        marked (list): List of currently marked fields.
-        mines (list): List of mine loctaions.
-        points (int): Number of points.
+        minefield (list of lists): Minefield containing 0 (empty fields) and 1
+            (mines).
+        x (int): Vertical size of minefield.
+        y (int): Horizontal size of minefield.
 
-    Attributes:
-        marked (list): List of currently marked fields.
-        mines (list): List of mine locations.
-        points (int): Number of points.
-
-    Raises:
-        TypeError: If given values do not match their expected types.
+    Returns:
+        list of lists: Minefield containing calculated values.
 
     """
+    minefield_values = [y * [0] for _ in range(x)]
+    # top-left corner (0, 0)
+    if minefield[0][0] == 1:
+        value = 9
+    else:
+        value = minefield[0][0] + minefield[0][1]
+        value += minefield[1][0] + minefield[1][1]
+    minefield_values[0][0] = value
+    # top-right corner (0, y-1)
+    if minefield[0][y-1] == 1:
+        value = 9
+    else:
+        value = minefield[0][y-1] + minefield[0][y-2]
+        value += minefield[1][y-1] + minefield[1][y-2]
+    minefield_values[0][y-1] = value
+    # bottom-left corner (x-1, 0)
+    if minefield[x-1][0] == 1:
+        value = 9
+    else:
+        value = minefield[x-1][0] + minefield[x-1][1]
+        value += minefield[x-2][0] + minefield[x-2][1]
+    minefield_values[x-1][0] = value
+    # bottom-right corner (x-1, y-1)
+    if minefield[x-1][y-1] == 1:
+        value = 9
+    else:
+        value = minefield[x-1][y-1] + minefield[x-1][y-2]
+        value += minefield[x-2][y-1] + minefield[x-2][y-2]
+    minefield_values[x-1][y-1] = value
+    # upper edge (0, (1, y-2))
+    for j in range(1, y-1):
+        if minefield[0][j] == 1:
+            value = 9
+        else:
+            value = minefield[0][j-1] + minefield[0][j]
+            value += minefield[0][j+1] + minefield[1][j-1]
+            value += minefield[1][j] + minefield[1][j+1]
+        minefield_values[0][j] = value
+    # lower edge (x-1, (1, y-2))
+    for j in range(1, y-1):
+        if minefield[x-1][j] == 1:
+            value = 9
+        else:
+            value = minefield[x-1][j-1] + minefield[x-1][j]
+            value += minefield[x-1][j+1] + minefield[x-2][j-1]
+            value += minefield[x-2][j] + minefield[x-2][j+1]
+        minefield_values[x-1][j] = value
+    # left edge ((1, x-2), 0)
+    for i in range(1, x-1):
+        if minefield[i][0] == 1:
+            value = 9
+        else:
+            value = minefield[i-1][0] + minefield[i][0]
+            value += minefield[i+1][0] + minefield[i-1][1]
+            value += minefield[i][1] + minefield[i+1][1]
+        minefield_values[i][0] = value
+    # right edge ((1, x-2), y-1)
+    for i in range(1, x-1):
+        if minefield[i][y-1] == 1:
+            value = 9
+        else:
+            value = minefield[i-1][y-1] + minefield[i][y-1]
+            value += minefield[i+1][y-1] + minefield[i-1][y-2]
+            value += minefield[i][y-2] + minefield[i+1][y-2]
+        minefield_values[i][y-1] = value
+    # all non border fields
+    for i in range(1, x-1):
+        for j in range(1, y-1):
+            if minefield[i][j] == 1:
+                value = 9
+            else:
+                value = minefield[i][j]
+                value += minefield[i][j-1] + minefield[i][j+1]
+                value += minefield[i-1][j-1] + minefield[i-1][j]
+                value += minefield[i-1][j+1] + minefield[i+1][j-1]
+                value += minefield[i+1][j] + minefield[i+1][j+1]
+            minefield_values[i][j] = value
+    return minefield_values
 
-    def __init__(self, marked, mines, points):
-        self.set_marked(marked)
-        self.set_mines(mines)
-        self.set_points(points)
 
-    def __repr__(self):
-        txt = "{"
-        txt += f"'marked':{self.marked}, "
-        txt += f"'mines':{self.mines}, "
-        txt += f"'points':{self.points}"
-        txt += "}"
-        return txt
+def value_calc_ver_4(minefield, x, y):
+    """In-place field value calculation and substitution.
 
-    def get_marked(self):
-        return self.marked
+    Issues: Once a single value is replaced behaviour of algorithm must
+    change adjusting to the now heterogenous environment caused by the
+    substituted value.
 
-    def set_marked(self, marked):
-        if not isinstance(marked, list):
-            raise TypeError('marked should be of type list')
-        self.marked = marked
+    Any field value already substituted could be changed to (string format or
+    to a int value exceeding 9) as an indicator of having been processed.
 
-    def get_mines(self):
-        return self.mines
+    Args:
+        minefield (list of lists): Minefield containing 0 (empty fields) and 1
+            (mines).
+        x (int): Vertical size of minefield.
+        y (int): Horizontal size of minefield.
 
-    def set_mines(self, mines):
-        if not isinstance(mines, list):
-            raise TypeError('mines should be of type list')
-        self.mines = mines
+    Returns:
+        list of lists: Minefield containing calculated values.
 
-    def get_points(self):
-        return self.points
-
-    def set_points(self, points):
-        if not isinstance(points, int):
-            raise TypeError('points should be of type int')
-        self.points = points
+    """
+    pass
 
 
 # %%
 
 
-# %%
+def generate_minefield(x, y, z):
+    """Main minesweeper function.
 
+    Generate minefield, calculate values of each field and display minefield.
 
-def main():
-    """Startup function for tkinter GUI Minesweeper game."""
+    Args:
+        x (int): Vertical size of minefield.
+        y (int): Horizontal size of minefield.
+        z (int): Number of mines.
+
+    """
+    minefield = []
+    # generation of empty minefield
+    for _ in range(x):
+        minefield.append(y * [0])
+    # addition of mines to the field
+    j = 0
+    while j < z:
+        a = randrange(1, x)
+        b = randrange(1, y)
+        if minefield[a][b] == 0:
+            minefield[a][b] = 1
+            j += 1
+    for line in minefield:
+        print(line)
+    print("-----------------------")
+    # calculation of values for each field and substitution
+    minefield_values = value_calc_ver_3(minefield, x, y)
+    for line in minefield_values:
+        print(line)
+    # Initialization of Tiles
     root = tk.Tk()
     root.title('Minesweeper')
-    # root.geometry('720x480')
-
-    score_frame = tk.Frame(root)
-    score_frame.pack(side='top', fill='x', padx='1m',
-                     pady='1m', ipadx='3m', ipady='3m')
-
-    mines_left = tk.Label(score_frame, text='Mines left: 15')
-    mines_left.pack(side='left', padx='3m')
-
-    score = tk.Label(score_frame, text='Score: 3/10')
-    score.pack(side='right', padx='3m')
-
-    control_frame = tk.Frame(root)
-    control_frame.pack(side='top', fill='x', padx='1m',
-                       pady='1m', ipadx='1m', ipady='1m')
-
-    left_frame = tk.Frame(control_frame)
-    left_frame.pack(side='left', fill='y', padx='1m',
-                    pady='1m', ipadx='3m', ipady='3m')
-
-    x_label = tk.Label(left_frame, text='Number of columns:')
-    x_label.pack(side='top', anchor='center')
-
-    x = tk.Entry(left_frame)
-    x.pack(side='top', anchor='center')
-
-    y_label = tk.Label(left_frame, text='Number of rows:')
-    y_label.pack(side='top', anchor='center')
-
-    y = tk.Entry(left_frame)
-    y.pack(side='top', anchor='center')
-
-    middle_frame = tk.Frame(control_frame)
-    middle_frame.pack(side='left', fill=tk.BOTH, padx='1m',
-                      pady='1m', ipadx='3m', ipady='3m')
-
-    nr_mines_label = tk.Label(middle_frame, text='Number of mines:')
-    nr_mines_label.pack(side='top', anchor='center')
-
-    nr_mines = tk.Entry(middle_frame)
-    nr_mines.pack(side='top', anchor='center')
-
-    right_frame = tk.Frame(control_frame)
-    right_frame.pack(side='right', fill=tk.BOTH, padx='1m',
-                     pady='1m', ipadx='3m', ipady='3m')
-
-    start_button = tk.Button(right_frame, text='START')
-    start_button.pack(anchor='center')
-
-    board_frame = tk.Frame(root, background='blue')
-    board_frame.pack(side='top', fill=tk.BOTH, expand=tk.YES,
-                     padx='1m', pady='1m', ipadx='3m', ipady='3m')
-
-    minefield = MineField(10)
-
-    board = Board(board_frame, minefield)
-    board._update_board()
-
-    info = tk.Label(root, text='Version 0.1', bd=1,
-                    relief='sunken', anchor='w')
-    info.pack(side='bottom', fill='x')
-
+    frame1 = tk.Frame(root)
+    frame1.pack()
+    board = [y * [0] for _ in range(x)]
+    for i in range(x):
+        for j in range(y):
+            board[i][j] = Tile(frame1, i, j, minefield_values[i][j], size=50)
+    # Tile linking
+    for i in range(x):
+        for j in range(y-1):
+            board[i][j].right_tile = board[i][j + 1]
+            board[i][j + 1].left_tile = board[i][j]
+    for i in range(x-1):
+        for j in range(y):
+            board[i][j].bottom_tile = board[i + 1][j]
+            board[i + 1][j].top_tile = board[i][j]
     root.mainloop()
 
 
 # %%
-if __name__ == "__main__":
-    main()
+generate_minefield(10, 10, 15)
+
 # %%
