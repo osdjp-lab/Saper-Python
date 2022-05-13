@@ -26,6 +26,8 @@ ICON[9] = Image.open("Minesweeper icons\\bomb.png")
 class Tile:
     """A single tile on the board.
 
+    TODO When field is flagged, field should not be uncoverable.
+
     Args:
         parent (tk.Frame): Parent Frame of Tile.
         x (int): x coordinate.
@@ -84,7 +86,6 @@ class Tile:
 
     def __repr__(self):
         txt = "{"
-        txt += f"'parent':{self.parent}, "
         txt += f"'x':{self.x}, "
         txt += f"'y':{self.y}, "
         txt += f"'state':{self.state}, "
@@ -453,87 +454,268 @@ class Tile:
 # %%
 
 
-def generate_minefield(x, y, z):
-    """Main minesweeper function.
+class Minesweeper:
+    """Minesweeper game.
 
     Generate minefield, calculate values of each field and display minefield.
 
+    TODO Instead of parent frame containing the board create secondary frame
+    within the parent frame for the score frame above and the status frame
+    below. The change will also allow for more tkinter gui like packing and
+    grid behaviour of Minesweeper.
+
+    NOTE Modification applied.
+
+    TODO 1) Main frame, subframes and Tile resizing.
+    TODO 2) Force first Tile to be uncovered to be empty.
+    TODO 3) Play, win and lose self resizing, and self repositioning frames.
+    TODO 4) Interactive only when no active game score frame controls.
+    TODO 5) Auto updated status frame values.
+
+    NOTE Extra features:
+
+    TODO 6) Before play button is pressed automatically playing
+    non-interactive Minesweeper game in the background.
+
+    NOTE First move can be random under the assumption that point 2 is
+    implemented.
+    while loop
+    Halt program exectution for a random amount of time in the range (1-3) s.
+    Generate list of deduceable empty fields based upon rules of deduction.
+    I. List all cov == True fields with at least one cov == False neighbouring
+    field the state of which is not equal 9.
+    II. From remaining list remove remaining non-deduceable fields.
+    Selected and uncover a randomly field.
+    exit condition: win (all empty fields have been uncovered)
+
+    TODO Find information on codetags/markup in vscode
+    https://www.python.org/dev/peps/pep-0350/
+
     Args:
+        parent (tk.Tk or tk.Frame): Parent tkinter Window or Frame Minesweeper.
         x (int): Vertical size of minefield.
         y (int): Horizontal size of minefield.
         z (int): Number of mines.
+        debug (bool): Debug flag. Defaults to False.
+
+    Attributes:
+        parent (tk.Tk or tk.Frame): Parent tkinter Window or Frame Minesweeper.
+        x (int): Vertical size of minefield.
+        y (int): Horizontal size of minefield.
+        z (int): Number of mines.
+        debug (bool): Debug flag. Defaults to False.
+        main_frame (tk.Frame): Main frame for containing Minesweeper subframes.
+        score_frame (tk.Frame): Subframe containing current score tally
+            including number of games played, number of losses and number of
+            wins.
+        board_frame (tk.Frame): Subframe containing Minesweeper board.
+        status_frame (tk.Frame): Subframe containing game status including
+            current board size and number of mines.
+        minefield (list of lists of int): Representation of minesweeper board
+            containing 0 (empty fields) and 1 (mines).
+        board (list of lists of Tile): Contains Tiles which make up the
+            minesweeper board.
 
     """
-    minefield = []
-    # generation of empty minefield
-    for _ in range(x):
-        minefield.append(y * [0])
-    # addition of mines to the field
-    j = 0
-    while j < z:
-        a = randrange(1, x)
-        b = randrange(1, y)
-        if minefield[a][b] == 0:
-            minefield[a][b] = 1
-            j += 1
-    for line in minefield:
-        print(line)
-    # Tile initialization
-    # Empty minefield generation and selection of mine locations could be
-    # integrated into Tile initialization
-    root = tk.Tk()
-    root.title('Minesweeper')
-    frame1 = tk.Frame(root)
-    frame1.pack()
-    board = [y * [0] for _ in range(x)]
-    for i in range(x):
-        for j in range(y):
-            board[i][j] = Tile(frame1, i, j, minefield[i][j], size=50)
-    # Tile linking
-    # Horizontal linking
-    for i in range(x):
-        for j in range(y-1):
-            board[i][j].right_tile = board[i][j + 1]
-            board[i][j + 1].left_tile = board[i][j]
-    # Vertical linking
-    for i in range(x-1):
-        for j in range(y):
-            board[i][j].bottom_tile = board[i + 1][j]
-            board[i + 1][j].top_tile = board[i][j]
-    # Bottom-Right and Top-Left cross linking
-    for i in range(x-1):
-        for j in range(y-1):
-            board[i][j].bottom_right_tile = board[i + 1][j + 1]
-            board[i + 1][j + 1].top_left_tile = board[i][j]
-    # Bottom-Left and Top-Right cross linking
-    for i in range(1, x):
-        for j in range(y-1):
-            board[i][j].bottom_left_tile = board[i - 1][j + 1]
-            board[i - 1][j + 1].top_right_tile = board[i][j]
-    # Calculation of values for each field
-    board[0][0].calculate_values()
-    print("--------------------------")
-    for line in board:
-        print([i.state for i in line])
-    root.mainloop()
+
+    def __init__(self, parent, x, y, z, debug=False):
+        self.parent = parent
+        self.x = x
+        self.y = y
+        self.z = z
+        self.debug = debug
+        self.main_frame = tk.Frame(self.parent)
+        self.score_frame = tk.Frame(self.main_frame)
+        self.board_frame = tk.Frame(self.main_frame)
+        self.status_frame = tk.Frame(self.main_frame)
+        self._generate_minefield()
+        self._init_tiles()
+        self._link_tiles()
+
+    def __repr__(self):
+        txt = "{"
+        txt += f"'x':{self.x}, "
+        txt += f"'y':{self.y}, "
+        txt += f"'z':{self.z}, "
+        txt += f"'debug':{self.debug}, "
+        txt += f"'minefield':{self.minefield}"
+        txt += "}"
+        return txt
+
+    def _generate_minefield(self):
+        """Generate and fill empty minefield."""
+        self.minefield = []
+
+        # generation of empty minefield
+        for _ in range(self.x):
+            self.minefield.append(self.y * [0])
+
+        # addition of mines to the minefield
+        j = 0
+        while j < self.z:
+            a = randrange(1, self.x)
+            b = randrange(1, self.y)
+            if self.minefield[a][b] == 0:
+                self.minefield[a][b] = 1
+                j += 1
+        if self.debug:
+            print("0/1 minefield representation:\n")
+            for line in self.minefield:
+                print(line)
+
+    def _init_tiles(self):
+        """Tile initialization.
+
+        NOTE Empty minefield generation and selection of mine locations could
+        be integrated into Tile initialization.
+
+        """
+        self.board = [self.y * [0] for _ in range(self.x)]
+        for i in range(self.x):
+            for j in range(self.y):
+                self.board[i][j] = Tile(self.board_frame, i, j,
+                                        self.minefield[i][j], size=50)
+
+    def _link_tiles(self):
+        """Tile linking."""
+        # Horizontal linking
+        for i in range(self.x):
+            for j in range(self.y-1):
+                self.board[i][j].right_tile = self.board[i][j + 1]
+                self.board[i][j + 1].left_tile = self.board[i][j]
+
+        # Vertical linking
+        for i in range(self.x-1):
+            for j in range(self.y):
+                self.board[i][j].bottom_tile = self.board[i + 1][j]
+                self.board[i + 1][j].top_tile = self.board[i][j]
+
+        # Bottom-Right and Top-Left cross linking
+        for i in range(self.x-1):
+            for j in range(self.y-1):
+                self.board[i][j].bottom_right_tile = self.board[i + 1][j + 1]
+                self.board[i + 1][j + 1].top_left_tile = self.board[i][j]
+
+        # Bottom-Left and Top-Right cross linking
+        for i in range(1, self.x):
+            for j in range(self.y-1):
+                self.board[i][j].bottom_left_tile = self.board[i - 1][j + 1]
+                self.board[i - 1][j + 1].top_right_tile = self.board[i][j]
+
+        # Calculation of values for each field
+        self.board[0][0].calculate_values()
+        if self.debug:
+            print("\nMinefield with calculated values:\n")
+            for line in self.board:
+                print([i.state for i in line])
+        self.score_frame.pack(side='top')
+        self.board_frame.pack(side='top')
+        self.status_frame.pack(side='top')
+
+    def pack(self, *args, **kwargs):
+        self.main_frame.pack(*args, **kwargs)
+
+    def grid(self, *args, **kwargs):
+        self.main_frame.grid(*args, **kwargs)
+
+    @property
+    def parent(self):
+        return self._parent
+
+    @parent.setter
+    def parent(self, parent):
+        if not isinstance(parent, (tk.Tk, tk.Frame)):
+            msg = 'parent should be of type tkinter.Tk or tkinter.Frame'
+            raise TypeError(msg)
+        self._parent = parent
+
+    @property
+    def x(self):
+        return self._x
+
+    @x.setter
+    def x(self, x):
+        if not isinstance(x, int):
+            raise TypeError('x should be of type int')
+        self._x = x
+
+    @property
+    def y(self):
+        return self._y
+
+    @y.setter
+    def y(self, y):
+        if not isinstance(y, int):
+            raise TypeError('y should be of type int')
+        self._y = y
+
+    @property
+    def z(self):
+        return self._z
+
+    @z.setter
+    def z(self, z):
+        if not isinstance(z, int):
+            raise TypeError('z should be of type int')
+        self._z = z
+
+    @property
+    def debug(self):
+        return self._debug
+
+    @debug.setter
+    def debug(self, debug):
+        if not isinstance(debug, bool):
+            raise TypeError('debug should be of type bool')
+        self._debug = debug
+
+    @property
+    def main_frame(self):
+        return self._main_frame
+
+    @main_frame.setter
+    def main_frame(self, main_frame):
+        if not isinstance(main_frame, tk.Frame):
+            raise TypeError('main_frame should be of type tkinter.Frame')
+        self._main_frame = main_frame
+
+    @property
+    def score_frame(self):
+        return self._score_frame
+
+    @score_frame.setter
+    def score_frame(self, score_frame):
+        if not isinstance(score_frame, tk.Frame):
+            raise TypeError('score_frame should be of type tkinter.Frame')
+        self._score_frame = score_frame
+
+    @property
+    def board_frame(self):
+        return self._board_frame
+
+    @board_frame.setter
+    def board_frame(self, board_frame):
+        if not isinstance(board_frame, tk.Frame):
+            raise TypeError('board_frame should be of type tkinter.Frame')
+        self._board_frame = board_frame
+
+    @property
+    def status_frame(self):
+        return self._status_frame
+
+    @status_frame.setter
+    def status_frame(self, status_frame):
+        if not isinstance(status_frame, tk.Frame):
+            raise TypeError('status_frame should be of type tkinter.Frame')
+        self._status_frame = status_frame
 
 
 # %%
-generate_minefield(10, 10, 10)
+
+root = tk.Tk()
+root.title('Minesweeper')
+game1 = Minesweeper(root, 10, 10, 10, True)
+game1.pack()
+root.mainloop()
 
 # %%
-# interesting minefield
-
-m1 = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
-      [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0],
-      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0]]
-
-for line in m1:
-    print(line)
