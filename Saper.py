@@ -30,17 +30,23 @@ class Tile:
         parent (tk.Frame): Parent Frame of Tile.
         x (int): x coordinate.
         y (int): y coordinate.
-        state (int): State of the given tile values from range 0 to 9.
+        state (int): State of the given Tile 0 (empty) or 1 (mine).
         cov (bool): Defaults to True if Tile is covered False overwise.
-        size (int): Size of tile in pixels. Defaults to None.
+        size (int): Size of Tile in pixels. Defaults to None.
 
     Attributes:
         parent (tk.Frame): Parent Frame of Tile.
         x (int): x coordinate.
         y (int): y coordinate.
-        state (int): State of the given tile values from range 0 to 9.
+        state (int): State of the given Tile 0 (empty) or 1 (mine).
         cov (bool): Defaults to True if Tile is covered False overwise.
-        size (int): Size of tile in pixels. Defaults to None.
+        size (int): Size of Tile in pixels. Defaults to None.
+        flagged (bool): False if Tile not flagged, True if flagged.
+        triggered (bool): False if Tile not triggered, True if triggered.
+        tmp_calc (bool): False if temporary Tile state values haven't been
+            calculated.
+        final_calc (bool): False if final Tile state values haven't been
+            calculated.
 
     Raises:
         TypeError: If given values do not match their expected types.
@@ -61,10 +67,20 @@ class Tile:
             self._update('c')
         else:
             self._update(self.state)
+        # surrounding Tile pointers
         self._top_tile = None
         self._bottom_tile = None
         self._left_tile = None
         self._right_tile = None
+        self._top_left_tile = None
+        self._top_right_tile = None
+        self._bottom_left_tile = None
+        self._bottom_right_tile = None
+        # flags
+        self.flagged = False
+        self.triggered = False
+        self.tmp_calc = False
+        self.final_calc = False
 
     def __repr__(self):
         txt = "{"
@@ -101,83 +117,194 @@ class Tile:
             else:
                 self._uncover()
 
+    def right_click(self, event):
+        """Flag Tile."""
+        if self.cov:
+            if not self.flagged:
+                self.switch('f')
+                self.flagged = True
+            else:
+                self.switch('c')
+                self.flagged = False
+
     def _uncover_all(self):
         """Recursive uncover of all Tiles.
-        
+
         BUG Partial uncover: when triggered mine is on isolated island
         surrounded by uncovered Tiles.
 
         NOTE Solution separate out triggered flag from cov so that _uncover_all
         can traverse uncovered Tiles.
-        
+
+        ISSUE SOLVED
+
         """
-        self.switch(self.state)
-        self.cov = False
-        # uncover surrounding Tiles if their cov = True
-        # top_tile
-        if self.top_tile is not None:
-            if self.top_tile.cov:
+        if not self.triggered:
+            self.switch(self.state)
+            self.cov = False
+            self.triggered = True
+            # uncover surrounding Tiles if their cov = True
+            # top_tile
+            if self.top_tile is not None:
                 self.top_tile._uncover_all()
-        # bottom_tile
-        if self.bottom_tile is not None:
-            if self.bottom_tile.cov:
+            # bottom_tile
+            if self.bottom_tile is not None:
                 self.bottom_tile._uncover_all()
-        # left_tile
-        if self.left_tile is not None:
-            if self.left_tile.cov:
+            # left_tile
+            if self.left_tile is not None:
                 self.left_tile._uncover_all()
-        # right_tile
-        if self.right_tile is not None:
-            if self.right_tile.cov:
+            # right_tile
+            if self.right_tile is not None:
                 self.right_tile._uncover_all()
 
     def _uncover(self):
-        """Recursive uncover of zero value and surrounding Tiles."""
-        self.switch(self.state)
-        self.cov = False
-        if self.state == 0:
-            # recursively check bordering Tiles
-            # uncover and continue or leave
-            # top_tile
-            if self.top_tile is not None:
-                if self.top_tile.cov:
+        """Recursive uncover of zero value and surrounding Tiles.
+
+        NOTE cov conditions could be limited down to one location.
+
+        SOLVED
+
+        """
+        if self.cov:
+            self.switch(self.state)
+            self.cov = False
+            if self.state == 0:
+                # recursively check bordering Tiles
+                # uncover and continue or leave
+                # top_tile
+                if self.top_tile is not None:
                     if self.top_tile.state == 0:
                         self.top_tile._uncover()
                     elif self.top_tile.state != 9:
                         self.top_tile.switch(self.top_tile.state)
                         self.top_tile.cov = False
-            # bottom_tile
-            if self.bottom_tile is not None:
-                if self.bottom_tile.cov:
+                # bottom_tile
+                if self.bottom_tile is not None:
                     if self.bottom_tile.state == 0:
                         self.bottom_tile._uncover()
                     elif self.bottom_tile.state != 9:
                         self.bottom_tile.switch(self.bottom_tile.state)
                         self.bottom_tile.cov = False
-            # left_tile
-            if self.left_tile is not None:
-                if self.left_tile.cov:
+                # left_tile
+                if self.left_tile is not None:
                     if self.left_tile.state == 0:
                         self.left_tile._uncover()
                     elif self.left_tile.state != 9:
                         self.left_tile.switch(self.left_tile.state)
                         self.left_tile.cov = False
-            # right_tile
-            if self.right_tile is not None:
-                if self.right_tile.cov:
+                # right_tile
+                if self.right_tile is not None:
                     if self.right_tile.state == 0:
                         self.right_tile._uncover()
                     elif self.right_tile.state != 9:
                         self.right_tile.switch(self.right_tile.state)
                         self.right_tile.cov = False
 
-    def right_click(self, event):
-        """Flag Tile."""
-        if self.cov:
-            self.switch('f')
+    def _value(self):
+        """Method for calculating transitioning field state values.
 
-    def pack(self, *args, **kwargs):
-        self.button.pack(*args, **kwargs)
+        Original values 0 or 1.
+
+        Calculated values (0-9) projected onto transitional range (10-19).
+
+        """
+        value = 0
+        if self.state == 1:
+            value = 9
+        else:
+            if self.top_tile is not None:
+                if self.top_tile.state in (0, 1):
+                    value += self.top_tile.state
+                elif self.top_tile.state == 19:
+                    value += 1
+            if self.bottom_tile is not None:
+                if self.bottom_tile.state in (0, 1):
+                    value += self.bottom_tile.state
+                elif self.bottom_tile.state == 19:
+                    value += 1
+            if self.left_tile is not None:
+                if self.left_tile.state in (0, 1):
+                    value += self.left_tile.state
+                elif self.left_tile.state == 19:
+                    value += 1
+            if self.right_tile is not None:
+                if self.right_tile.state in (0, 1):
+                    value += self.right_tile.state
+                elif self.right_tile.state == 19:
+                    value += 1
+            if self.top_left_tile is not None:
+                if self.top_left_tile.state in (0, 1):
+                    value += self.top_left_tile.state
+                elif self.top_left_tile.state == 19:
+                    value += 1
+            if self.top_right_tile is not None:
+                if self.top_right_tile.state in (0, 1):
+                    value += self.top_right_tile.state
+                elif self.top_right_tile.state == 19:
+                    value += 1
+            if self.bottom_left_tile is not None:
+                if self.bottom_left_tile.state in (0, 1):
+                    value += self.bottom_left_tile.state
+                elif self.bottom_left_tile.state == 19:
+                    value += 1
+            if self.bottom_right_tile is not None:
+                if self.bottom_right_tile.state in (0, 1):
+                    value += self.bottom_right_tile.state
+                elif self.bottom_right_tile.state == 19:
+                    value += 1
+        return value + 10
+
+    def calculate_values(self):
+        """In-place field value calculation.
+
+        NOTE reason why original commented final value calculation failed.
+
+        """
+        self.tmp_value_calc()
+        self.final_value_calc()
+        # if not self.final_calc:
+        #     self.state -= 10
+        #     self.final_calc = True
+
+    def tmp_value_calc(self):
+        """Transitional value calculation."""
+        if not self.tmp_calc:
+            self.state = self._value()
+            self.tmp_calc = True
+            # recursively check bordering Tiles calculate their
+            # transitional state value and continue
+            # top_tile
+            if self.top_tile is not None:
+                self.top_tile.tmp_value_calc()
+            # bottom_tile
+            if self.bottom_tile is not None:
+                self.bottom_tile.tmp_value_calc()
+            # left_tile
+            if self.left_tile is not None:
+                self.left_tile.tmp_value_calc()
+            # right_tile
+            if self.right_tile is not None:
+                self.right_tile.tmp_value_calc()
+
+    def final_value_calc(self):
+        """Final value calculation."""
+        if not self.final_calc:
+            self.state -= 10
+            self.final_calc = True
+            # recursively check bordering Tiles calculate their
+            # final state value and continue
+            # top_tile
+            if self.top_tile is not None:
+                self.top_tile.final_value_calc()
+            # bottom_tile
+            if self.bottom_tile is not None:
+                self.bottom_tile.final_value_calc()
+            # left_tile
+            if self.left_tile is not None:
+                self.left_tile.final_value_calc()
+            # right_tile
+            if self.right_tile is not None:
+                self.right_tile.final_value_calc()
 
     def grid(self, *args, **kwargs):
         self.button.grid(row=self.x, column=self.y, *args, **kwargs)
@@ -282,319 +409,45 @@ class Tile:
             raise TypeError('right_tile should be of type Tile')
         self._right_tile = right_tile
 
+    @property
+    def top_left_tile(self):
+        return self._top_left_tile
 
-# %%
+    @top_left_tile.setter
+    def top_left_tile(self, top_left_tile):
+        if not isinstance(top_left_tile, Tile):
+            raise TypeError('top_left_tile should be of type Tile')
+        self._top_left_tile = top_left_tile
 
+    @property
+    def top_right_tile(self):
+        return self._top_right_tile
 
-def value_calc_ver_1(minefield, x, y):
-    """Minimal amount of code value calculation.
+    @top_right_tile.setter
+    def top_right_tile(self, top_right_tile):
+        if not isinstance(top_right_tile, Tile):
+            raise TypeError('top_right_tile should be of type Tile')
+        self._top_right_tile = top_right_tile
 
-    85 lines.
+    @property
+    def bottom_left_tile(self):
+        return self._bottom_left_tile
 
-    Args:
-        minefield (list of lists): Minefield containing 0 (empty fields) and 1
-            (mines).
-        x (int): Vertical size of minefield.
-        y (int): Horizontal size of minefield.
+    @bottom_left_tile.setter
+    def bottom_left_tile(self, bottom_left_tile):
+        if not isinstance(bottom_left_tile, Tile):
+            raise TypeError('bottom_left_tile should be of type Tile')
+        self._bottom_left_tile = bottom_left_tile
 
-    Returns:
-        list of lists: Minefield containing calculated values.
+    @property
+    def bottom_right_tile(self):
+        return self._bottom_right_tile
 
-    """
-    minefield_values = [y * [0] for _ in range(x)]
-    for i in range(x):
-        for j in range(y):
-            # if a field in either direction along the horizontal or vertical
-            # axis is out of bound then other fields sharing the same
-            # coordiate are also out of bound
-            up, down, left, right = True, True, True, True
-            # up-down check
-            if i == 0:
-                up = False
-            elif i + 1 == x:
-                down = False
-            # left-right check
-            if j == 0:
-                left = False
-            elif j + 1 == y:
-                right = False
-            if minefield[i][j] == 1:
-                value = 9
-            else:
-                # current field
-                value = minefield[i][j]
-                if up:
-                    # field above
-                    value += minefield[i-1][j]
-                    if down:
-                        # field below
-                        value += minefield[i+1][j]
-                        if left:
-                            # field to the left
-                            value += minefield[i][j-1]
-                            if right:
-                                # field to the right
-                                value += minefield[i][j+1]
-                                # remaining available fields
-                                value += minefield[i-1][j-1]
-                                value += minefield[i-1][j+1]
-                                value += minefield[i+1][j-1]
-                                value += minefield[i+1][j+1]
-                            else:
-                                value += minefield[i-1][j-1]
-                                value += minefield[i+1][j-1]
-                        else:
-                            # field to the right
-                            value += minefield[i][j+1]
-                            # remaining available fields
-                            value += minefield[i+1][j+1]
-                            value += minefield[i-1][j+1]
-                    else:
-                        if left:
-                            # field to the left
-                            value += minefield[i][j-1]
-                            if right:
-                                # field to the right
-                                value += minefield[i][j+1]
-                                # remaining available fields
-                                value += minefield[i-1][j-1]
-                                value += minefield[i-1][j+1]
-                            else:
-                                value += minefield[i-1][j-1]
-                        else:
-                            # field to the right
-                            value += minefield[i][j+1]
-                            # remaining available fields
-                            value += minefield[i-1][j+1]
-                else:
-                    # field below
-                    value += minefield[i+1][j]
-                    if left:
-                        # field to the left
-                        value += minefield[i][j-1]
-                        if right:
-                            # field to the right
-                            value += minefield[i][j+1]
-                            # remaining available fields
-                            value += minefield[i+1][j-1]
-                            value += minefield[i+1][j+1]
-                        else:
-                            value += minefield[i+1][j-1]
-                    else:
-                        # field to the right
-                        value += minefield[i][j+1]
-                        value += minefield[i+1][j+1]
-            minefield_values[i][j] = value
-    return minefield_values
-
-
-def value_calc_ver_2(minefield, x, y):
-    """Minimal amount of code value calculation.
-
-    74 lines.
-
-    Args:
-        minefield (list of lists): Minefield containing 0 (empty fields) and 1
-            (mines).
-        x (int): Vertical size of minefield.
-        y (int): Horizontal size of minefield.
-
-    Returns:
-        list of lists: Minefield containing calculated values.
-
-    """
-    minefield_values = [y * [0] for _ in range(x)]
-    for i in range(x):
-        for j in range(y):
-            # if a field in either direction along the horizontal or vertical
-            # axis is out of bound then other fields sharing the same
-            # coordiate are also out of bound
-            if minefield[i][j] == 1:
-                value = 9
-            else:
-                # current field
-                value = minefield[i][j]
-                if i != 0:
-                    # field above
-                    value += minefield[i-1][j]
-                    if i + 1 != x:
-                        # field below
-                        value += minefield[i+1][j]
-                        if j != 0:
-                            # field to the left
-                            value += minefield[i][j-1]
-                            if j + 1 != y:
-                                # field to the right
-                                value += minefield[i][j+1]
-                                # remaining available fields
-                                value += minefield[i-1][j-1]
-                                value += minefield[i-1][j+1]
-                                value += minefield[i+1][j-1]
-                                value += minefield[i+1][j+1]
-                            else:
-                                value += minefield[i-1][j-1]
-                                value += minefield[i+1][j-1]
-                        else:
-                            # field to the right
-                            value += minefield[i][j+1]
-                            # remaining available fields
-                            value += minefield[i+1][j+1]
-                            value += minefield[i-1][j+1]
-                    else:
-                        if j != 0:
-                            # field to the left
-                            value += minefield[i][j-1]
-                            if j + 1 != y:
-                                # field to the right
-                                value += minefield[i][j+1]
-                                # remaining available fields
-                                value += minefield[i-1][j-1]
-                                value += minefield[i-1][j+1]
-                            else:
-                                value += minefield[i-1][j-1]
-                        else:
-                            # field to the right
-                            value += minefield[i][j+1]
-                            # remaining available fields
-                            value += minefield[i-1][j+1]
-                else:
-                    # field below
-                    value += minefield[i+1][j]
-                    if j != 0:
-                        # field to the left
-                        value += minefield[i][j-1]
-                        if j + 1 != y:
-                            # field to the right
-                            value += minefield[i][j+1]
-                            # remaining available fields
-                            value += minefield[i+1][j-1]
-                            value += minefield[i+1][j+1]
-                        else:
-                            value += minefield[i+1][j-1]
-                    else:
-                        # field to the right
-                        value += minefield[i][j+1]
-                        value += minefield[i+1][j+1]
-            minefield_values[i][j] = value
-    return minefield_values
-
-
-def value_calc_ver_3(minefield, x, y):
-    """Minimal number of steps value calculation.
-
-    78 lines.
-
-    Args:
-        minefield (list of lists): Minefield containing 0 (empty fields) and 1
-            (mines).
-        x (int): Vertical size of minefield.
-        y (int): Horizontal size of minefield.
-
-    Returns:
-        list of lists: Minefield containing calculated values.
-
-    """
-    minefield_values = [y * [0] for _ in range(x)]
-    # top-left corner (0, 0)
-    if minefield[0][0] == 1:
-        value = 9
-    else:
-        value = minefield[0][0] + minefield[0][1]
-        value += minefield[1][0] + minefield[1][1]
-    minefield_values[0][0] = value
-    # top-right corner (0, y-1)
-    if minefield[0][y-1] == 1:
-        value = 9
-    else:
-        value = minefield[0][y-1] + minefield[0][y-2]
-        value += minefield[1][y-1] + minefield[1][y-2]
-    minefield_values[0][y-1] = value
-    # bottom-left corner (x-1, 0)
-    if minefield[x-1][0] == 1:
-        value = 9
-    else:
-        value = minefield[x-1][0] + minefield[x-1][1]
-        value += minefield[x-2][0] + minefield[x-2][1]
-    minefield_values[x-1][0] = value
-    # bottom-right corner (x-1, y-1)
-    if minefield[x-1][y-1] == 1:
-        value = 9
-    else:
-        value = minefield[x-1][y-1] + minefield[x-1][y-2]
-        value += minefield[x-2][y-1] + minefield[x-2][y-2]
-    minefield_values[x-1][y-1] = value
-    # upper edge (0, (1, y-2))
-    for j in range(1, y-1):
-        if minefield[0][j] == 1:
-            value = 9
-        else:
-            value = minefield[0][j-1] + minefield[0][j]
-            value += minefield[0][j+1] + minefield[1][j-1]
-            value += minefield[1][j] + minefield[1][j+1]
-        minefield_values[0][j] = value
-    # lower edge (x-1, (1, y-2))
-    for j in range(1, y-1):
-        if minefield[x-1][j] == 1:
-            value = 9
-        else:
-            value = minefield[x-1][j-1] + minefield[x-1][j]
-            value += minefield[x-1][j+1] + minefield[x-2][j-1]
-            value += minefield[x-2][j] + minefield[x-2][j+1]
-        minefield_values[x-1][j] = value
-    # left edge ((1, x-2), 0)
-    for i in range(1, x-1):
-        if minefield[i][0] == 1:
-            value = 9
-        else:
-            value = minefield[i-1][0] + minefield[i][0]
-            value += minefield[i+1][0] + minefield[i-1][1]
-            value += minefield[i][1] + minefield[i+1][1]
-        minefield_values[i][0] = value
-    # right edge ((1, x-2), y-1)
-    for i in range(1, x-1):
-        if minefield[i][y-1] == 1:
-            value = 9
-        else:
-            value = minefield[i-1][y-1] + minefield[i][y-1]
-            value += minefield[i+1][y-1] + minefield[i-1][y-2]
-            value += minefield[i][y-2] + minefield[i+1][y-2]
-        minefield_values[i][y-1] = value
-    # all non border fields
-    for i in range(1, x-1):
-        for j in range(1, y-1):
-            if minefield[i][j] == 1:
-                value = 9
-            else:
-                value = minefield[i][j]
-                value += minefield[i][j-1] + minefield[i][j+1]
-                value += minefield[i-1][j-1] + minefield[i-1][j]
-                value += minefield[i-1][j+1] + minefield[i+1][j-1]
-                value += minefield[i+1][j] + minefield[i+1][j+1]
-            minefield_values[i][j] = value
-    return minefield_values
-
-
-def value_calc_ver_4(minefield, x, y):
-    """In-place field value calculation and substitution.
-
-    Issues: Once a single value is replaced behaviour of algorithm must
-    change adjusting to the now heterogenous environment caused by the
-    substituted value.
-
-    Any field value already substituted could be changed to (string format or
-    to a int value exceeding 9) as an indicator of having been processed.
-
-    Args:
-        minefield (list of lists): Minefield containing 0 (empty fields) and 1
-            (mines).
-        x (int): Vertical size of minefield.
-        y (int): Horizontal size of minefield.
-
-    Returns:
-        list of lists: Minefield containing calculated values.
-
-    """
-    pass
+    @bottom_right_tile.setter
+    def bottom_right_tile(self, bottom_right_tile):
+        if not isinstance(bottom_right_tile, Tile):
+            raise TypeError('bottom_right_tile should be of type Tile')
+        self._bottom_right_tile = bottom_right_tile
 
 
 # %%
@@ -625,12 +478,9 @@ def generate_minefield(x, y, z):
             j += 1
     for line in minefield:
         print(line)
-    print("-----------------------")
-    # calculation of values for each field and substitution
-    minefield_values = value_calc_ver_3(minefield, x, y)
-    for line in minefield_values:
-        print(line)
-    # Initialization of Tiles
+    # Tile initialization
+    # Empty minefield generation and selection of mine locations could be
+    # integrated into Tile initialization
     root = tk.Tk()
     root.title('Minesweeper')
     frame1 = tk.Frame(root)
@@ -638,20 +488,52 @@ def generate_minefield(x, y, z):
     board = [y * [0] for _ in range(x)]
     for i in range(x):
         for j in range(y):
-            board[i][j] = Tile(frame1, i, j, minefield_values[i][j], size=50)
+            board[i][j] = Tile(frame1, i, j, minefield[i][j], size=50)
     # Tile linking
+    # Horizontal linking
     for i in range(x):
         for j in range(y-1):
             board[i][j].right_tile = board[i][j + 1]
             board[i][j + 1].left_tile = board[i][j]
+    # Vertical linking
     for i in range(x-1):
         for j in range(y):
             board[i][j].bottom_tile = board[i + 1][j]
             board[i + 1][j].top_tile = board[i][j]
+    # Bottom-Right and Top-Left cross linking
+    for i in range(x-1):
+        for j in range(y-1):
+            board[i][j].bottom_right_tile = board[i + 1][j + 1]
+            board[i + 1][j + 1].top_left_tile = board[i][j]
+    # Bottom-Left and Top-Right cross linking
+    for i in range(1, x):
+        for j in range(y-1):
+            board[i][j].bottom_left_tile = board[i - 1][j + 1]
+            board[i - 1][j + 1].top_right_tile = board[i][j]
+    # Calculation of values for each field
+    board[0][0].calculate_values()
+    print("--------------------------")
+    for line in board:
+        print([i.state for i in line])
     root.mainloop()
 
 
 # %%
-generate_minefield(10, 10, 15)
+generate_minefield(10, 10, 10)
 
 # %%
+# interesting minefield
+
+m1 = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+      [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0],
+      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0]]
+
+for line in m1:
+    print(line)
