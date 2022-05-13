@@ -24,17 +24,20 @@ ICON[9] = Image.open("Minesweeper icons\\bomb.png")
 
 
 class Tile:
-    """A single tile on the board.
+    """A single minesweeper Tile.
 
     TODO When field is flagged, field should not be uncoverable.
+
+    NOTE Modification applied.
 
     Args:
         parent (tk.Frame): Parent Frame of Tile.
         x (int): x coordinate.
         y (int): y coordinate.
         state (int): State of the given Tile 0 (empty) or 1 (mine).
-        cov (bool): Defaults to True if Tile is covered False overwise.
-        size (int): Size of Tile in pixels. Defaults to None.
+        cov (bool, optional): Defaults to True if Tile is covered False
+            overwise.
+        size (int, optional): Size of Tile in pixels. Defaults to None.
 
     Attributes:
         parent (tk.Frame): Parent Frame of Tile.
@@ -43,6 +46,15 @@ class Tile:
         state (int): State of the given Tile 0 (empty) or 1 (mine).
         cov (bool): Defaults to True if Tile is covered False overwise.
         size (int): Size of Tile in pixels. Defaults to None.
+        board (Board): Tile parent Board.
+        top_tile (Tile): Top Tile
+        bottom_tile (Tile): Bottom Tile
+        left_tile (Tile): Left Tile
+        right_tile (Tile): Right Tile
+        top_left_tile (Tile): Top left Tile
+        top_right_tile (Tile): Top right Tile
+        bottom_left_tile (Tile): Bottom left Tile
+        bottom_right_tile (Tile): Bottom right Tile
         flagged (bool): False if Tile not flagged, True if flagged.
         triggered (bool): False if Tile not triggered, True if triggered.
         tmp_calc (bool): False if temporary Tile state values haven't been
@@ -69,6 +81,7 @@ class Tile:
             self._update('c')
         else:
             self._update(self.state)
+        self._board = None
         # surrounding Tile pointers
         self._top_tile = None
         self._bottom_tile = None
@@ -113,10 +126,11 @@ class Tile:
     def left_click(self, event):
         """Uncover Tile."""
         if self.cov:
-            if self.state == 9:
-                self._uncover_all()
-            else:
-                self._uncover()
+            if not self.flagged:
+                if self.state == 9:
+                    self._uncover_all()
+                else:
+                    self._uncover()
 
     def right_click(self, event):
         """Flag Tile."""
@@ -450,14 +464,22 @@ class Tile:
             raise TypeError('bottom_right_tile should be of type Tile')
         self._bottom_right_tile = bottom_right_tile
 
+    @property
+    def board(self):
+        return self._board
+
+    @board.setter
+    def board(self, board):
+        if not isinstance(board, Board):
+            raise TypeError('board should be of type Board')
+        self._board = board
+
 
 # %%
 
 
-class Minesweeper:
-    """Minesweeper game.
-
-    Generate minefield, calculate values of each field and display minefield.
+class Board:
+    """Minesweeper Board consisting of Tiles.
 
     TODO Instead of parent frame containing the board create secondary frame
     within the parent frame for the score frame above and the status frame
@@ -492,14 +514,14 @@ class Minesweeper:
     https://www.python.org/dev/peps/pep-0350/
 
     Args:
-        parent (tk.Tk or tk.Frame): Parent tkinter Window or Frame Minesweeper.
+        parent (tk.Frame): Parent Frame Minesweeper.
         x (int): Vertical size of minefield.
         y (int): Horizontal size of minefield.
         z (int): Number of mines.
-        debug (bool): Debug flag. Defaults to False.
+        debug (bool, optional): Debug flag. Defaults to False.
 
     Attributes:
-        parent (tk.Tk or tk.Frame): Parent tkinter Window or Frame Minesweeper.
+        parent (tk.Frame): Parent Frame Minesweeper.
         x (int): Vertical size of minefield.
         y (int): Horizontal size of minefield.
         z (int): Number of mines.
@@ -617,6 +639,9 @@ class Minesweeper:
 
     def grid(self, *args, **kwargs):
         self.main_frame.grid(*args, **kwargs)
+    
+    def destroy(self, *args, **kwargs):
+        self.main_frame.destroy(*args, **kwargs)
 
     @property
     def parent(self):
@@ -712,9 +737,96 @@ class Minesweeper:
 
 # %%
 
+
+class Minesweeper:
+    """Minesweeper game.
+
+    Args:
+        parent (tk.Tk or tk.Frame): Parent tkinter Window or Frame Minesweeper.
+        debug (bool, optional): Debug flag. Defaults to False.
+
+    Attributes:
+        parent (tk.Tk or tk.Frame): Parent tkinter Window or Frame Minesweeper.
+        debug (bool): Debug flag. Defaults to False.
+
+    Raises:
+        TypeError: If given values do not match their expected types.
+
+    """
+
+    def __init__(self, parent):
+        self.parent = parent
+
+    def start(self):
+        self.minesweeper = Board(self.parent, self.x, self.y,
+                                 self.z, self.debug)
+    
+    def pack(self, *args, **kwargs):
+        self.minesweeper.pack(*args, **kwargs)
+
+    def grid(self, *args, **kwargs):
+        self.minesweeper.grid(*args, **kwargs)
+
+    def destroy(self, *args, **kwargs):
+        self.minesweeper.destroy(*args, **kwargs)
+
+    @property
+    def parent(self):
+        return self._parent
+
+    @parent.setter
+    def parent(self, parent):
+        if not isinstance(parent, (tk.Tk, tk.Frame)):
+            msg = 'parent should be of type tkinter.Tk or tkinter.Frame'
+            raise TypeError(msg)
+        self._parent = parent
+
+    @property
+    def x(self):
+        return self._x
+
+    @x.setter
+    def x(self, x):
+        if not isinstance(x, int):
+            raise TypeError('x should be of type int')
+        self._x = x
+
+    @property
+    def y(self):
+        return self._y
+
+    @y.setter
+    def y(self, y):
+        if not isinstance(y, int):
+            raise TypeError('y should be of type int')
+        self._y = y
+
+    @property
+    def z(self):
+        return self._z
+
+    @z.setter
+    def z(self, z):
+        if not isinstance(z, int):
+            raise TypeError('z should be of type int')
+        self._z = z
+
+    @property
+    def debug(self):
+        return self._debug
+
+    @debug.setter
+    def debug(self, debug):
+        if not isinstance(debug, bool):
+            raise TypeError('debug should be of type bool')
+        self._debug = debug
+
+
+# %%
+
 root = tk.Tk()
 root.title('Minesweeper')
-game1 = Minesweeper(root, 10, 10, 10, True)
+game1 = Minesweeper(root)
 game1.pack()
 root.mainloop()
 
